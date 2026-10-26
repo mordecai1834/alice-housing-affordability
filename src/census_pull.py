@@ -28,6 +28,13 @@ BASE_URL = "https://api.census.gov/data/{year}/acs/acs5"
 # Census "no data" codes that must never be treated as real numbers
 MISSING_CODES = [-666666666, -999999999, -888888888, -222222222, -333333333, -555555555]
 
+def GEO_PARAMS(geography, state, county):
+    if geography == "count":
+        return [("for", "county:*"), ("in", f"state:{state}")]
+    if geography == "tract":
+        return [("for","tract"),("for", "county:*"), ("in", f"state:{state}")]
+    else:
+        raise RuntimeError(f"Census error geography must include {state}, {county}, or {tract}")
 
 def pull_acs_table(table, year=ACS_YEAR, state=STATE_FIPS):
     """Pull one whole ACS table (estimates + margins of error) for every
