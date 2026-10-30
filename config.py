@@ -10,6 +10,7 @@ HUD_API_TOKEN = os.getenv("HUD_API_TOKEN")
 
 DB_PATH = BASE_DIR / "db" / "alice.db"
 RAW_DIR = BASE_DIR / "data" / "raw"
+PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 # Locked vintages (Field Guide Step 1)
 ACS_YEAR = 2024
