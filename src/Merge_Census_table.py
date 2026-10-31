@@ -24,8 +24,8 @@ QUALITY_SIZE_TABLES = [
     "B25051",   # kitchen (quality filter)
     "B25014",   # overcrowding (quality filter)
 ]
-
-duplicate_columns = ["NAME", "state","county"]
+#Columns that each table has causing duplicate errors, they are to be ignored
+duplicate_columns = ["NAME","NAME.1","state","county"]
 ALL_TABLES = CORE_TABLES + QUALITY_SIZE_TABLES
 
 
