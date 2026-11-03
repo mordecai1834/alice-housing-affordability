@@ -32,7 +32,7 @@ ALL_TABLES = CORE_TABLES + QUALITY_SIZE_TABLES
 def merge_census_tables(ALL_TABLES):
     master = None
     for table in ALL_TABLES:
-        file_path = RAW_DIR / f"acs5_2024_{table}.csv"
+        file_path = RAW_DIR / f"acs5_2024_{table}_readable.csv"
 
         df = pd.read_csv(file_path)
 
