@@ -104,19 +104,26 @@ def get_table_metadata(table, year=ACS_YEAR):
     return metadata_df.reset_index()
 
 def save_readable_csv(df, metadata_df, table, year=ACS_YEAR):
-    """
-    Rename Census data columns using the table concept and variable label.
-    Preserve geographic identifier columns.
-    """
 
-    # Geographic columns that must keep their original names
+    # Geographic columns that we want to preserve
     geo_columns = ["GEO_ID", "NAME", "state", "county"]
 
-    # Only use metadata for actual data columns
+    # Only keep metadata for columns that exist in the data
     metadata_df = metadata_df[
         metadata_df["variable_code"].isin(df.columns)
-        & ~metadata_df["variable_code"].isin(geo_columns)
     ].copy()
+
+    # Keep only Estimate (E) and Margin of Error (M) variables from this table
+    metadata_df = metadata_df[
+        metadata_df["variable_code"].str.fullmatch(rf"{table}_\d+[EM]", na=False)
+    ].copy()
+
+    # Keep geographic columns plus E and M variables
+    keep_columns = geo_columns + metadata_df["variable_code"].tolist()
+
+    readable_df = df[[
+        col for col in keep_columns if col in df.columns
+    ]].copy()
 
     column_mapping = {}
 
@@ -128,29 +135,30 @@ def save_readable_csv(df, metadata_df, table, year=ACS_YEAR):
 
         if pd.notna(label) and pd.notna(concept):
 
+            # Remove everything inside parentheses from the concept
+            concept = concept.split(" (")[0]
+
+            # Replace !! with a readable separator
             readable_label = label.replace("!!", " - ")
 
-            # Remove redundant Estimate prefix
+            # Remove redundant Estimate / Margin of Error prefixes
             readable_label = readable_label.removeprefix("Estimate - ")
+            readable_label = readable_label.removeprefix("Margin of Error - ")
 
+            # Build the final column name
             readable_name = f"{concept} - {readable_label} [{code}]"
 
             column_mapping[code] = readable_name
 
-    # Rename only ACS variables
-    readable_df = df.rename(columns=column_mapping).copy()
+    # Rename the columns
+    readable_df = readable_df.rename(columns=column_mapping)
 
     # Save readable CSV
     output_path = Path(RAW_DIR) / f"acs5_{year}_{table}_readable.csv"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     readable_df.to_csv(output_path, index=False)
 
-    # Save metadata separately
-    metadata_path = Path(RAW_DIR) / f"acs5_{year}_{table}_metadata.csv"
-    metadata_df.to_csv(metadata_path, index=False)
-
     print(f"Readable CSV saved: {output_path}")
-    print(f"Metadata CSV saved: {metadata_path}")
 
     return readable_df
 
