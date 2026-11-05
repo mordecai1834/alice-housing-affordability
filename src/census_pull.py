@@ -103,31 +103,144 @@ def get_table_metadata(table, year=ACS_YEAR):
 
     return metadata_df.reset_index()
 
-def save_readable_csv(df, metadata_df, table, year=ACS_YEAR):
 
-    # Geographic columns that we want to preserve
+
+def save_readable_csv(df, metadata_df, table, year=ACS_YEAR):
+    """
+    Combine Census estimates and margins of error into one column:
+    Estimate (Low-High).
+
+    Preserve geographic columns and use Census metadata for
+    readable column names.
+    """
+
+    # Geographic columns that must be preserved
     geo_columns = ["GEO_ID", "NAME", "state", "county"]
 
-    # Only keep metadata for columns that exist in the data
+    # 1. Validate the input DataFrame
+
+    missing_geo = [
+        col for col in geo_columns
+        if col not in df.columns
+    ]
+
+    if missing_geo:
+        raise ValueError(
+            f"{table} is missing geographic columns: {missing_geo}"
+        )
+
+    # Check for duplicate columns in the original data
+    if df.columns.duplicated().any():
+        duplicates = df.columns[df.columns.duplicated()].tolist()
+        raise ValueError(
+            f"{table} contains duplicate input columns: {duplicates}"
+        )
+
+    # 2. Filter metadata to actual Census variables
+
     metadata_df = metadata_df[
         metadata_df["variable_code"].isin(df.columns)
     ].copy()
 
-    # Keep only Estimate (E) and Margin of Error (M) variables from this table
+    # Only accept standard ACS estimate and MOE codes
     metadata_df = metadata_df[
-        metadata_df["variable_code"].str.fullmatch(rf"{table}_\d+[EM]", na=False)
+        metadata_df["variable_code"].str.match(
+            r"^[A-Z]\d{5}_\d{3}[EM]$",
+            na=False
+        )
     ].copy()
 
-    # Keep geographic columns plus E and M variables
-    keep_columns = geo_columns + metadata_df["variable_code"].tolist()
+    # Check that metadata does not contain duplicate codes
+    if metadata_df["variable_code"].duplicated().any():
+        duplicates = metadata_df.loc[
+            metadata_df["variable_code"].duplicated(),
+            "variable_code"
+        ].tolist()
 
-    readable_df = df[[
-        col for col in keep_columns if col in df.columns
-    ]].copy()
+        raise ValueError(
+            f"{table} has duplicate metadata variable codes: {duplicates}"
+        )
+
+    # 3. Combine estimates and margins of error
+
+    readable_df = df.copy()
+
+    estimate_codes = [
+        code for code in metadata_df["variable_code"]
+        if code.endswith("E")
+    ]
+
+    moe_columns = []
+
+    for estimate_code in estimate_codes:
+
+        # Find matching margin of error column
+        moe_code = estimate_code[:-1] + "M"
+
+        if moe_code not in readable_df.columns:
+            print(
+                f"Warning: {table} is missing {moe_code}. "
+                f"Keeping {estimate_code} as its original estimate."
+            )
+            continue
+
+        # Convert values to numeric
+        estimate = pd.to_numeric(
+            readable_df[estimate_code],
+            errors="coerce"
+        )
+
+        moe = pd.to_numeric(
+            readable_df[moe_code],
+            errors="coerce"
+        )
+
+        # Replace Census missing-value codes
+        estimate = estimate.replace(
+            MISSING_CODES, float("nan")
+        )
+
+        moe = moe.replace(
+            MISSING_CODES, float("nan")
+        )
+
+        # Calculate lower and upper bounds
+        low = estimate - moe
+        high = estimate + moe
+
+        # Combine into Estimate (Low-High)
+        readable_df[estimate_code] = [
+            f"{e:g} ({l:g}-{h:g})"
+            if pd.notna(e) and pd.notna(l) and pd.notna(h)
+            else None
+            for e, l, h in zip(estimate, low, high)
+        ]
+
+        # Track MOE column for removal
+        moe_columns.append(moe_code)
+
+    # Remove original MOE columns
+    readable_df = readable_df.drop(
+        columns=moe_columns,
+        errors="ignore"
+    )
+
+    # 4. Keep geographic and estimate columns only
+
+    keep_columns = geo_columns + estimate_codes
+
+    readable_df = readable_df[
+        [col for col in keep_columns if col in readable_df.columns]
+    ].copy()
+    # 5. Rename columns using Census metadata
 
     column_mapping = {}
 
-    for _, row in metadata_df.iterrows():
+    estimate_metadata = metadata_df[
+        metadata_df["variable_code"].str.endswith("E")
+    ]
+
+    for _, row in estimate_metadata.iterrows():
 
         code = row["variable_code"]
         label = row["label"]
@@ -135,32 +248,58 @@ def save_readable_csv(df, metadata_df, table, year=ACS_YEAR):
 
         if pd.notna(label) and pd.notna(concept):
 
-            # Remove everything inside parentheses from the concept
+            # Remove parentheses and everything inside them
             concept = concept.split(" (")[0]
 
-            # Replace !! with a readable separator
+            # Replace Census label separators
             readable_label = label.replace("!!", " - ")
 
-            # Remove redundant Estimate / Margin of Error prefixes
-            readable_label = readable_label.removeprefix("Estimate - ")
-            readable_label = readable_label.removeprefix("Margin of Error - ")
+            # Remove redundant Estimate prefix
+            readable_label = readable_label.removeprefix(
+                "Estimate - "
+            )
 
-            # Build the final column name
-            readable_name = f"{concept} - {readable_label} [{code}]"
+            # Construct readable column name
+            readable_name = (
+                f"{concept} - {readable_label} [{code}]"
+            )
 
             column_mapping[code] = readable_name
 
-    # Rename the columns
-    readable_df = readable_df.rename(columns=column_mapping)
+    readable_df = readable_df.rename(
+        columns=column_mapping
+    )
+    # 6. Validate final column names
 
-    # Save readable CSV
-    output_path = Path(RAW_DIR) / f"acs5_{year}_{table}_readable.csv"
+    if readable_df.columns.duplicated().any():
+        duplicates = readable_df.columns[
+            readable_df.columns.duplicated()
+        ].tolist()
+
+        raise ValueError(
+            f"{table} produced duplicate readable columns: {duplicates}"
+        )
+
+    # 7. Save readable CSV
+
+
+    output_path = (
+        Path(RAW_DIR) /
+        f"acs5_{year}_{table}_readable.csv"
+    )
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     readable_df.to_csv(output_path, index=False)
 
+    print(
+        f"{table}: {len(readable_df)} rows, "
+        f"{len(readable_df.columns)} columns"
+    )
     print(f"Readable CSV saved: {output_path}")
 
     return readable_df
+
+
 
 def make_all_tables_readable(tables=ALL_TABLES, year=ACS_YEAR):
     """
