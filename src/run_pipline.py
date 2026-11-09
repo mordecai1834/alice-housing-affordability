@@ -1,5 +1,3 @@
-from pathlib import Path
-import pandas as pd
 import census_pull, Merge_Census_table, xlsx_converstion
 
 if __name__ == "__main__":

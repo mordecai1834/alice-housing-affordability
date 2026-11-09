@@ -5,28 +5,11 @@ import json
 import pandas as pd
 import requests
 
-from config import ACS_YEAR, CENSUS_API_KEY, RAW_DIR, STATE_FIPS
-CORE_TABLES = [
-    "B19001",   # household income (ALICE count)
-    "B19037",   # income by age of householder (age-split demand)
-    "B25063",   # gross rent distribution
-    "B25087",   # owner costs with mortgage
-    "B25088",   # Monthly owner costs with mortgage
-    "B25007",   # tenure by age
-    "B25027",   # mortgage status by age
-    "B25093",   # owner costs as % of income, by age
-    "B25072",   # gross rent as % of income, by age
-]
-QUALITY_SIZE_TABLES = [
-    "B25041",   # bedrooms (size)
-    "B25034",   # year built (quality proxy)
-    "B25047",   # plumbing (quality filter)
-    "B25051",   # kitchen (quality filter)
-    "B25014",   # overcrowding (quality filter)
-]
+from config import ACS_YEAR, CENSUS_API_KEY, RAW_DIR, STATE_FIPS, ALL_TABLES
+
 
 BASE_URL = "https://api.census.gov/data/{year}/acs/acs5"
-ALL_TABLES = CORE_TABLES + QUALITY_SIZE_TABLES
+
 # Census "no data" codes that must never be treated as real numbers
 MISSING_CODES = [-666666666, -999999999, -888888888, -222222222, -333333333, -555555555]
 
@@ -335,4 +318,5 @@ def make_all_tables_readable(tables=ALL_TABLES, year=ACS_YEAR):
     return results
 
 if __name__ == "__main__":
-    make_all_tables_readable()
+    pull_tables(ALL_TABLES)
+    make_all_tables_readable(ALL_TABLES)
