@@ -11,7 +11,7 @@ RAW_DIR = Path(RAW_DIR)
 duplicate_columns = ["NAME","NAME.1","state","county"]
 
 
-def merge_census_tables(CORE_QUALITY_TABLES):
+def merge_census_tables(CORE_QUALITY_TABLES=CORE_QUALITY_TABLES):
     master = None
     for table in CORE_QUALITY_TABLES:
         file_path = RAW_DIR / f"acs5_2024_{table}_readable.csv"
@@ -30,7 +30,7 @@ def merge_census_tables(CORE_QUALITY_TABLES):
     master.to_csv(PROCESSED_DIR / "Merge_Census_table.csv", index=False)
     print(f"file saved to{PROCESSED_DIR}/Merge_Census_table.csv")
 
-def merge_house_descriptive_tables(HOUSE_HOLD_DESCRIPTIVE_VARIABLES):
+def merge_house_descriptive_tables(HOUSE_HOLD_DESCRIPTIVE_VARIABLES=HOUSE_HOLD_DESCRIPTIVE_VARIABLES):
     master = None
     for table in HOUSE_HOLD_DESCRIPTIVE_VARIABLES:
         file_path = RAW_DIR / f"acs5_2024_{table}_readable.csv"

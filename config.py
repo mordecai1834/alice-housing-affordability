@@ -35,6 +35,7 @@ HOUSE_HOLD_DESCRIPTIVE_VARIABLES = [
     "B11007",#Household with somone 65+
     "B09021",#Living arragnment(alone/ with spouse/ with others)
     "B12002",#Marital status by age, detail
+    "B11003",#Family Type by Presence and Age of Own Children
 ]
 
 CORE_QUALITY_TABLES = CORE_TABLES + QUALITY_SIZE_TABLES
